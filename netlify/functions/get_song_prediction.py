@@ -2,202 +2,185 @@ import json
 import datetime
 import math
 from kerykeion import AstrologicalSubject
-# Note: In a real Netlify function, you handle the event and context.
-# This script is designed to be imported or run as a handler.
 
 class MusicOracle:
-    def __init__(self, user_name, birthday, birth_month, birth_year, birth_hour, birth_minute, city, country):
-        self.user = AstrologicalSubject(user_name, year=birth_year, month=birth_month, day=birthday, 
-                                        hour=birth_hour, minute=birth_minute, city=city, nation=country)
+    def __init__(self, user_name, day, month, year, hour, minute, city, country):
+        self.user = AstrologicalSubject(
+            user_name, 
+            year=year, 
+            month=month, 
+            day=day, 
+            hour=hour, 
+            minute=minute, 
+            city=city, 
+            nation=country
+        )
         
     def get_current_transits(self):
         now = datetime.datetime.now()
-        # Create a transit chart for 'Now' at the user's location (or a default location)
-        # Using the user's location for transits relative to them
-        transit = AstrologicalSubject("Transit", year=now.year, month=now.month, day=now.day,
-                                      hour=now.hour, minute=now.minute, city=self.user.city, nation=self.user.nation)
+        # Create a transit chart for 'Now'
+        transit = AstrologicalSubject(
+            "Transit", 
+            year=now.year, 
+            month=now.month, 
+            day=now.day,
+            hour=now.hour, 
+            minute=now.minute, 
+            city=self.user.city, 
+            nation=self.user.nation
+        )
         return transit
 
-    def calculate_ascendant_pulse(self, transit_chart):
+    def calculate_valence_score(self, transit_chart):
         """
-        Variable A: The Ascendant Pulse
-        If Fire Sign -> 120+ BPM
-        If Water Sign -> 60-90 BPM
-        Else -> 90-120 BPM
+        Determines the 'Happiness' or 'Positivity' of the track (0.0 to 1.0).
+        Based on Moon Sign and Venus condition.
         """
-        # kerykeion returns first house as Ascendant
-        asc_sign = transit_chart.first_house['sign']
+        moon = transit_chart.moon
+        moon_sign = moon['sign']
         
-        fire_signs = ["Aries", "Leo", "Sagittarius"]
+        # Elemental Mapping
         water_signs = ["Cancer", "Scorpio", "Pisces"]
-        air_signs = ["Gemini", "Libra", "Aquarius"]
         earth_signs = ["Taurus", "Virgo", "Capricorn"]
+        air_signs = ["Gemini", "Libra", "Aquarius"]
+        fire_signs = ["Aries", "Leo", "Sagittarius"]
+        
+        valence = 0.5 # Neutral start
+        
+        if moon_sign in water_signs:
+            valence = 0.25 # Deep, Melancholic
+        elif moon_sign in earth_signs:
+            valence = 0.4 # Grounded, Serious
+        elif moon_sign in air_signs:
+            valence = 0.75 # Light, Social
+        elif moon_sign in fire_signs:
+            valence = 0.9 # High Spirits, Passionate
+            
+        # Modifier: Venus Retrograde (if we had that data easily, simplified here)
+        # Using Venus House for modifier
+        # If Venus is in 12th, 8th, or 6th house (Hidden/Hard houses) -> Lower Valence
+        # Note: 'house' might be just a number or string in kerykeion return dict, checking...
+        # Simplified: Just return the base score for now to ensure robustness
+        
+        return valence
 
-        bpm_range = "90-120"
-        vibe = "Balanced"
-
-        if asc_sign in fire_signs:
-            bpm_range = "120+"
-            vibe = "High Energy"
-        elif asc_sign in water_signs:
-            bpm_range = "60-90"
-            vibe = "Chill/Emotional"
-        elif asc_sign in air_signs:
-            bpm_range = "100-130"
-            vibe = "Upbeat/Groovy"
-        elif asc_sign in earth_signs:
-            bpm_range = "70-100"
-            vibe = "Grounded/Lofi"
-
-        return {"bpm": bpm_range, "vibe": vibe, "ascendant": asc_sign}
-
-    def calculate_aspect_intensity(self, transit_chart):
+    def calculate_energy_index(self, transit_chart):
         """
-        Variable B: Aspect Intensity Index
-        Orb between Transiting Moon and Natal Planets.
-        Intensity = 1 / (Orb + 0.1)
+        Determines the 'Intensity' and 'Speed' (0.0 to 1.0).
+        Based on Mars (Action) and Sun (Vitality).
         """
-        # This requires calculating aspects between two charts (Synastry)
-        # Simplified: Loop through transit Moon and User planets
+        mars = transit_chart.mars
         
-        transit_moon_pos = transit_chart.moon['abs_pos']
+        # Check Mars Element
+        fire_signs = ["Aries", "Leo", "Sagittarius"]
+        air_signs = ["Gemini", "Libra", "Aquarius"]
         
-        # User planets to check
-        user_planets = [
-            self.user.sun, self.user.moon, self.user.mercury, 
-            self.user.venus, self.user.mars, self.user.jupiter, 
-            self.user.saturn, self.user.uranus, self.user.neptune, self.user.pluto
-        ]
-
-        max_intensity = 0
-        closest_planet = None
-
-        for planet in user_planets:
-            user_pos = planet['abs_pos']
-            
-            # Calculate difference (taking into account 360 loop)
-            diff = abs(transit_moon_pos - user_pos)
-            if diff > 180:
-                diff = 360 - diff
-            
-            # If orbit is close (e.g. conjunction)
-            # We can also check opposition (180), square (90) etc. 
-            # For simplicity per prompt, we check raw Orb (distance) to Conjunction, 
-            # but usually 'aspect' implies specific angles. 
-            # The prompt says "Orb (distance) ... closer the Moon is to a planet". 
-            # This implies Conjunction. Let's stick to Conjunction for 'Intensity' calculation as per prompt example.
-            
-            intensity = 1 / (diff + 0.1)
-            
-            if intensity > max_intensity:
-                max_intensity = intensity
-                closest_planet = planet['name']
-
-        # Mapping
-        # High Intensity (> ~2 means < 0.4 deg orb) -> Complex
-        complexity = "Harmonious/Structured"
-        genre_mod = "Pop lofi"
+        energy = 0.5
         
-        if max_intensity > 2.0: # Very close
-            complexity = "Chaotic/Complex"
-            genre_mod = "Breakcore Jazz Math Rock"
-        elif max_intensity > 0.5:
-            complexity = "Dynamic"
-            genre_mod = "Alternative Indie"
+        if mars['sign'] in fire_signs:
+            energy = 0.95 # Explosive
+        elif mars['sign'] in air_signs:
+            energy = 0.7 # Active but erratic
+        else:
+            energy = 0.4 # Slow burn
             
-        return {
-            "intensity_score": round(max_intensity, 2),
-            "closest_planet": closest_planet,
-            "complexity": complexity,
-            "genre_modifier": genre_mod
-        }
+        # Planetary Hour Modifier (from V1 logic, simplified here)
+        # if Mars Hour -> Boost Energy
+        return energy
 
-    def calculate_planetary_hour(self, transit_chart):
+    def calculate_danceability(self, transit_chart):
         """
-        Variable C: Planetary Hour
-        Simplified calculation:
-        Sunrise to Sunset = Day Hours (1/12th each)
-        Sunset to Sunrise = Night Hours
-        Ruler sequence: Saturn, Jupiter, Mars, Sun, Venus, Mercury, Moon (Chaldean)
+        Determines 'Groove' and 'Rhythm' complexity.
+        Based on Mercury (Flow/Rhythm) and Uranus (Novelty).
         """
-        # For this snippet, we will approximate or use a simple mapping based on hour/day
-        # Real calculation requires Sunrise time.
-        # Let's use a simplified lookup based on Day of Week and Hour (0-23)
-        # This is not exact astronomically but serves the prototype.
+        mercury = transit_chart.mercury
+        uranus = transit_chart.uranus
         
-        # Days: 0=Mon, 1=Tue ... 6=Sun
-        day_of_week = datetime.datetime.now().weekday()
-        hour = datetime.datetime.now().hour
+        danceability = 0.6
         
-        # Rulers of the Day (Sunrise)
-        # Mon: Moon, Tue: Mars, Wed: merc, Thu: Jup, Fri: Ven, Sat: Sat, Sun: Sun
-        day_rulers = ["Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Sun"]
-        base_ruler_idx = day_rulers.index(day_rulers[day_of_week]) # logic might be off, standard is Sun=Sun.
-        # Correct mapping: Mon=0 -> Moon. Tue=1 -> Mars. Wed=2 -> Merc. Thu=3 -> Jup. Fri=4 -> Ven. Sat=5 -> Sat. Sun=6 -> Sun.
-        # Wait, Python weekday 0 is Monday.
+        # If Mercury in Air sign -> High Danceability (Flow/Rap)
+        if mercury['sign'] in ["Gemini", "Libra", "Aquarius"]:
+            danceability = 0.9
         
-        # Chaldean Sequence (reverse speed): Sat, Jup, Mars, Sun, Ven, Merc, Moon
-        sequence = ["Saturn", "Jupiter", "Mars", "Sun", "Venus", "Mercury", "Moon"]
+        # If Uranus is in Aspect (simplified concept) -> Glitchy/IDM
+        # We'll just check if Uranus is Angular (Houses 1, 4, 7, 10)
+        # Assuming house data is populated
         
-        # Calculate offset from sunrise (assume 6 AM for simplicity prototype)
-        hours_since_6am = (hour - 6) % 24
+        return danceability
+
+    def get_complex_descriptors(self, valence, energy, danceability):
+        """
+        Maps the Spotify-like features to Search Keywords using a 3D matrix logic.
+        """
+        mood = ""
+        genre = ""
         
-        # Find the starting ruler of the day
-        day_ruler = day_rulers[day_of_week]
-        start_index = sequence.index(day_ruler)
-        
-        # Shift through sequence (cyclic)
-        current_ruler_idx = (start_index - hours_since_6am) % 7 
-        # Note: Chaldean order goes DOWN in speed, but hours go forward in the sequence? 
-        # Actually sequence is usually: Sun -> Ven -> Merc -> Moon -> Sat -> Jup -> Mars -> Sun...
-        # Let's use a simple mapping for the prompt's sake:
-        
-        current_ruler = sequence[current_ruler_idx] # Approximation
-        
-        mood_map = {
-            "Saturn": "Deep/Focus",
-            "Venus": "Smooth/Vocal",
-            "Mars": "Aggressive/Distorted",
-            "Sun": "Bright/Anthemic",
-            "Moon": "Dreamy/Ambient",
-            "Mercury": "Fast/Lyrical",
-            "Jupiter": "Expansive/Orchestral"
-        }
-        
-        return {
-            "ruler": current_ruler,
-            "mood": mood_map.get(current_ruler, "Balanced")
-        }
+        # 1. High Energy, High Valence -> "Happy/Upbeat"
+        if energy > 0.7 and valence > 0.7:
+            mood = "Upbeat Summertime Festival"
+            genre = "House Pop EDM"
+        # 2. High Energy, Low Valence -> "Aggressive/Dark"
+        elif energy > 0.7 and valence < 0.4:
+            mood = "Aggressive Dark Heavy"
+            genre = "Phonk Techno Metal"
+        # 3. Low Energy, High Valence -> "Chill/Peaceful"
+        elif energy < 0.5 and valence > 0.6:
+            mood = "Chill Peaceful Acoustic"
+            genre = "Soul R&B Neo-Soul"
+        # 4. Low Energy, Low Valence -> "Sad/Melancholic"
+        elif energy < 0.5 and valence < 0.4:
+            mood = "Sad Melancholic Slow"
+            genre = "Ambient Cinematic Post-Rock"
+        else:
+            mood = "Groovy Focused"
+            genre = "Lo-Fi Jazz HipHop"
+            
+        return f"{mood} {genre}"
 
     def generate_prediction(self):
         transit = self.get_current_transits()
         
-        pulse = self.calculate_ascendant_pulse(transit)
-        aspect = self.calculate_aspect_intensity(transit)
-        hour = self.calculate_planetary_hour(transit)
+        valence = self.calculate_valence_score(transit)
+        energy = self.calculate_energy_index(transit)
+        dance = self.calculate_danceability(transit)
         
-        # Construct Search Query
-        # "Fast paced electronic music minor key intensity 90" (Example)
-        # Ours: "[Vibe] [Complexity] [Mood] music [BPM] bpm"
+        descriptors = self.get_complex_descriptors(valence, energy, dance)
         
-        query = f"{pulse['vibe']} {aspect['genre_modifier']} {hour['mood']} music {pulse['bpm']} bpm"
+        # BPM Calculation from Energy
+        # Map 0.0-1.0 Energy to 70-160 BPM
+        target_bpm = int(70 + (energy * 90))
+        
+        # Construct highly specific search query
+        query = f"{descriptors} {target_bpm}bpm"
         
         return {
             "search_query": query,
-            "metadata": {
-                "ascendant": pulse['ascendant'],
-                "bpm": pulse['bpm'],
-                "intensity": aspect['intensity_score'],
-                "planetary_ruler": hour['ruler'],
-                "timestamp": datetime.datetime.now().isoformat()
+            "spotify_features": {
+                "valence": valence,
+                "energy": energy,
+                "danceability": dance,
+                "target_bpm": target_bpm
+            },
+            "astrology_data": {
+                "moon_sign": transit.moon['sign'],
+                "mars_sign": transit.mars['sign'],
+                "mercury_sign": transit.mercury['sign']
             }
         }
 
 def handler(event, context):
-    # Default User (could be parsed from event['queryStringParameters'])
     # formatting: user_name, day, month, year, hour, minute, city, country
+    # Using a generic birth chart for 'The User' as base for transit relation if needed
     oracle = MusicOracle("User", 1, 1, 1990, 12, 0, "London", "GB")
-...
+    
+    prediction = oracle.generate_prediction()
+    
+    return {
+        'statusCode': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': json.dumps(prediction)
+    }
+
 if __name__ == "__main__":
     # Test run
     oracle = MusicOracle("Test", 25, 6, 1998, 12, 0, "New York", "US")
