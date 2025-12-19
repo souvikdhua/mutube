@@ -54,6 +54,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart';
 import 'package:yt_dlp_dart/yt_dlp_dart.dart';
 import 'package:flutter_new_pipe_extractor/flutter_new_pipe_extractor.dart';
+import 'package:spotube/widgets/astrology_live_widget.dart';
 
 Future<void> main(List<String> rawArgs) async {
   if (rawArgs.contains("web_view_title_bar")) {
@@ -213,7 +214,17 @@ class Spotube extends HookConsumerWidget {
           );
         }
 
-        return child;
+        return Stack(
+          textDirection: TextDirection.ltr,
+          children: [
+            child,
+            const Positioned(
+              top: 40,
+              right: 20,
+              child: SafeArea(child: AstrologyLiveWidget()),
+            ),
+          ],
+        );
       },
       scaling: const AdaptiveScaling(1),
       theme: ThemeData(
