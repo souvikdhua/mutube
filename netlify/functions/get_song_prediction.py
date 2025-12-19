@@ -1,7 +1,7 @@
 import json
 import datetime
 import math
-from kerykeion import KrInstance, AstrologicalSubject
+from kerykeion import AstrologicalSubject
 # Note: In a real Netlify function, you handle the event and context.
 # This script is designed to be imported or run as a handler.
 
@@ -195,17 +195,10 @@ class MusicOracle:
 
 def handler(event, context):
     # Default User (could be parsed from event['queryStringParameters'])
-    oracle = MusicOracle("User", 1990, 1, 1, 12, 0, "London", "GB")
-    
-    prediction = oracle.generate_prediction()
-    
-    return {
-        'statusCode': 200,
-        'headers': {'Content-Type': 'application/json'},
-        'body': json.dumps(prediction)
-    }
-
+    # formatting: user_name, day, month, year, hour, minute, city, country
+    oracle = MusicOracle("User", 1, 1, 1990, 12, 0, "London", "GB")
+...
 if __name__ == "__main__":
     # Test run
-    oracle = MusicOracle("Test", 1998, 6, 25, 12, 0, "New York", "US")
+    oracle = MusicOracle("Test", 25, 6, 1998, 12, 0, "New York", "US")
     print(json.dumps(oracle.generate_prediction(), indent=2))
